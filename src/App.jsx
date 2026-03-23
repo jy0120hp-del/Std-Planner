@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   ChevronLeft, ChevronRight, Plus, CheckCircle2, 
   Camera, LogOut, Loader2, XCircle, LayoutDashboard, Wallet, ListChecks,
-  Edit2, Trash2
+  Edit2, Trash2, X
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://tjfamywgqesntiidlddi.supabase.co';
@@ -20,6 +20,9 @@ const StudyGroupApp = () => {
   const [allPlans, setAllPlans] = useState([]);
   const [loginInput, setLoginInput] = useState("");
   const [uploading, setUploading] = useState(null);
+  
+  // ✅ 이미지 확대용 상태 추가
+  const [zoomImage, setZoomImage] = useState(null);
 
   useEffect(() => { fetchMembers(); }, []);
   useEffect(() => { fetchAllPlans(); }, [view]);
@@ -114,66 +117,16 @@ const StudyGroupApp = () => {
     fetchPlans(selectedMember.name, currentDate);
   };
 
-  // ✅ 스타일 정의 (모바일 대응 강화 및 Members 화면 최적화)
   const styles = {
-    container: { 
-      maxWidth: '100vw', // 화면 끝까지 채우기
-      margin: '0', 
-      backgroundColor: '#f8fafc', 
-      minHeight: '100vh', 
-      paddingBottom: '100px', // 메뉴 바 공간 확보
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      boxSizing: 'border-box'
-    },
-    header: { 
-      padding: '20px 16px', 
-      backgroundColor: 'white', 
-      borderBottom: '1px solid #f1f5f9', // 밑줄 끝까지 확장
-      display: 'flex', 
-      justifyContent: 'space-between', 
-      alignItems: 'center', 
-      position: 'sticky', 
-      top: 0, 
-      zIndex: 50 
-    },
-    nav: { 
-      position: 'fixed', 
-      bottom: 0, 
-      left: '50%',
-      transform: 'translateX(-50%)',
-      maxWidth: '100vw', // 화면 끝까지 채우기
-      width: '100%', 
-      backgroundColor: 'white', 
-      display: 'flex', 
-      justifyContent: 'space-around', 
-      padding: '12px 0 24px 0', // 아이폰 하단 바 대응 여백
-      borderTop: '1px solid #f1f5f9',
-      boxShadow: '0 -4px 12px rgba(0,0,0,0.03)'
-    },
-    navBtn: (active) => ({ 
-      flex: 1, // 균등 분배
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
-      gap: '4px', 
-      color: active ? '#2563eb' : '#94a3b8', 
-      border: 'none', 
-      background: 'none', 
-      fontSize: '11px', 
-      fontWeight: active ? 'bold' : 'normal',
-      cursor: 'pointer' 
-    }),
-    table: { 
-      width: '100%', 
-      borderCollapse: 'collapse', 
-      backgroundColor: 'white', 
-      borderRadius: '16px', 
-      overflow: 'hidden', 
-      fontSize: '12px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-    },
+    container: { maxWidth: '100vw', margin: '0', backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '100px', fontFamily: '-apple-system, sans-serif', boxSizing: 'border-box' },
+    header: { padding: '20px 16px', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50 },
+    nav: { position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', maxWidth: '100vw', width: '100%', backgroundColor: 'white', display: 'flex', justifyContent: 'space-around', padding: '12px 0 24px 0', borderTop: '1px solid #f1f5f9', boxShadow: '0 -4px 12px rgba(0,0,0,0.03)' },
+    navBtn: (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: active ? '#2563eb' : '#94a3b8', border: 'none', background: 'none', fontSize: '11px', fontWeight: active ? 'bold' : 'normal', cursor: 'pointer' }),
+    table: { width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', fontSize: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
     th: { backgroundColor: '#f8fafc', padding: '12px 4px', border: '1px solid #f1f5f9', color: '#64748b', fontWeight: 'bold' },
-    td: { padding: '12px 4px', border: '1px solid #f1f5f9', textAlign: 'center' }
+    td: { padding: '12px 4px', border: '1px solid #f1f5f9', textAlign: 'center' },
+    // ✅ 이미지 확대 모달 스타일
+    modal: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }
   };
 
   if (!user) {
@@ -181,7 +134,7 @@ const StudyGroupApp = () => {
       <div style={{...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}}>
         <form onSubmit={handleLogin} style={{backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)'}}>
           <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px', letterSpacing: '-1px'}}>STUDY MATE</h2>
-          <p style={{color: '#94a3b8', marginBottom: '30px', fontSize: '14px'}}>환영합니다! 이름을 입력해주세요.</p>
+          <p style={{color: '#94a3b8', marginBottom: '30px', fontSize: '14px'}}>이름을 입력해주세요.</p>
           <input style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '16px', boxSizing: 'border-box', fontSize: '16px', outline: 'none'}} placeholder="이름 입력" value={loginInput} onChange={e => setLoginInput(e.target.value)} />
           <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none', fontSize: '16px', cursor: 'pointer'}}>입장하기</button>
         </form>
@@ -191,6 +144,16 @@ const StudyGroupApp = () => {
 
   return (
     <div style={styles.container}>
+      {/* ✅ 이미지 확대 모달 */}
+      {zoomImage && (
+        <div style={styles.modal} onClick={() => setZoomImage(null)}>
+          <button style={{position: 'absolute', top: '30px', right: '20px', background: 'none', border: 'none', color: 'white'}} onClick={() => setZoomImage(null)}>
+            <X size={32} />
+          </button>
+          <img src={zoomImage} style={{maxWidth: '100%', maxHeight: '80%', borderRadius: '12px', boxShadow: '0 0 20px rgba(0,0,0,0.5)'}} alt="확대" />
+        </div>
+      )}
+
       <header style={styles.header}>
         <h2 style={{fontWeight: 900, fontSize: '24px', color: '#1e293b'}}>{view === 'members' ? 'MEMBERS' : view === 'progress' ? '진행 현황' : '벌금 현황'}</h2>
         <button onClick={() => {setUser(null); setView('members');}} style={{border: 'none', background: 'none', color: '#94a3b8'}}><LogOut size={22}/></button>
@@ -200,17 +163,7 @@ const StudyGroupApp = () => {
         {view === 'members' && !selectedMember && (
           <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
             {members.map(m => (
-              <div key={m.id} onClick={() => setSelectedMember(m)} style={{
-                backgroundColor: 'white', 
-                padding: '30px', // 회색 바탕 꽉 채우기
-                borderRadius: '24px', // 큼직하게 변경
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                border: '1px solid #f1f5f9', 
-                cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
-              }}>
+              <div key={m.id} onClick={() => setSelectedMember(m)} style={{backgroundColor: 'white', padding: '30px', borderRadius: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #f1f5f9', cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.02)'}}>
                 <span style={{fontWeight: 'bold', fontSize: '20px', color: '#334155'}}>{m.name}</span>
                 <ChevronRight size={22} color="#cbd5e1"/>
               </div>
@@ -238,10 +191,17 @@ const StudyGroupApp = () => {
               <div key={p.id} style={{backgroundColor: 'white', padding: '20px', borderRadius: '20px', border: '1px solid #f1f5f9', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)'}}>
                 <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
                   <div style={{flex: 1, fontWeight: 'bold', fontSize: '16px', color: p.is_done ? '#cbd5e1' : '#334155', lineHeight: '1.4'}}>{p.task}</div>
-                  <label style={{width: 48, height: 48, borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#f8fafc'}}>
-                    {uploading === p.id ? <Loader2 size={20} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : <Camera size={20} color="#94a3b8"/>}
-                    <input type="file" accept="image/*" style={{display: 'none'}} onChange={e => handleFileUpload(e, p)} disabled={user.name !== selectedMember.name}/>
-                  </label>
+                  
+                  {/* ✅ 이미지 클릭 시 확대 기능 연결 */}
+                  <div style={{width: 48, height: 48, borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#f8fafc', cursor: 'pointer'}} 
+                       onClick={() => p.image_url && setZoomImage(p.image_url)}>
+                    {uploading === p.id ? <Loader2 size={20} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : 
+                      <label style={{cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%'}}>
+                        <Camera size={20} color="#94a3b8"/>
+                        <input type="file" accept="image/*" style={{display: 'none'}} onChange={e => handleFileUpload(e, p)} disabled={user.name !== selectedMember.name}/>
+                      </label>
+                    }
+                  </div>
                   {p.is_done ? <CheckCircle2 size={28} color="#22c55e"/> : <div style={{width: 28, height: 28, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>}
                 </div>
                 {user.name === selectedMember.name && (
