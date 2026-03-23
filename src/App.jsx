@@ -20,8 +20,6 @@ const StudyGroupApp = () => {
   const [allPlans, setAllPlans] = useState([]);
   const [loginInput, setLoginInput] = useState("");
   const [uploading, setUploading] = useState(null);
-  
-  // ✅ 이미지 확대용 상태 추가
   const [zoomImage, setZoomImage] = useState(null);
 
   useEffect(() => { fetchMembers(); }, []);
@@ -125,7 +123,6 @@ const StudyGroupApp = () => {
     table: { width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', fontSize: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
     th: { backgroundColor: '#f8fafc', padding: '12px 4px', border: '1px solid #f1f5f9', color: '#64748b', fontWeight: 'bold' },
     td: { padding: '12px 4px', border: '1px solid #f1f5f9', textAlign: 'center' },
-    // ✅ 이미지 확대 모달 스타일
     modal: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box' }
   };
 
@@ -144,7 +141,6 @@ const StudyGroupApp = () => {
 
   return (
     <div style={styles.container}>
-      {/* ✅ 이미지 확대 모달 */}
       {zoomImage && (
         <div style={styles.modal} onClick={() => setZoomImage(null)}>
           <button style={{position: 'absolute', top: '30px', right: '20px', background: 'none', border: 'none', color: 'white'}} onClick={() => setZoomImage(null)}>
@@ -190,9 +186,11 @@ const StudyGroupApp = () => {
             ) : dailyPlans.map(p => (
               <div key={p.id} style={{backgroundColor: 'white', padding: '20px', borderRadius: '20px', border: '1px solid #f1f5f9', marginBottom: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)'}}>
                 <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                  <div style={{flex: 1, fontWeight: 'bold', fontSize: '16px', color: p.is_done ? '#cbd5e1' : '#334155', lineHeight: '1.4'}}>{p.task}</div>
+                  {/* ✅ 여기서 textAlign: 'left'를 적용했습니다! */}
+                  <div style={{flex: 1, fontWeight: 'bold', fontSize: '16px', color: p.is_done ? '#cbd5e1' : '#334155', lineHeight: '1.4', textAlign: 'left'}}>
+                    {p.task}
+                  </div>
                   
-                  {/* ✅ 이미지 클릭 시 확대 기능 연결 */}
                   <div style={{width: 48, height: 48, borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#f8fafc', cursor: 'pointer'}} 
                        onClick={() => p.image_url && setZoomImage(p.image_url)}>
                     {uploading === p.id ? <Loader2 size={20} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : 
