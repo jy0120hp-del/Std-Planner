@@ -111,11 +111,18 @@ const StudyGroupApp = () => {
     });
   };
 
+  // ★ 현황판 로직 수정: "오늘"은 아직 판단하지 않음
   const getDayStatus = (name, dateStr) => {
     const todayStr = getKSTDate();
-    if (dateStr > todayStr) return "pending"; 
+    
+    // 오늘(24일)이거나 미래 날짜면 판단 보류 (자정 지나야 함)
+    if (dateStr >= todayStr) return "pending"; 
+
     const dayPlans = allPlans.filter(p => p.user_name === name && p.date === dateStr);
+    
+    // 과거인데 계획이 0개면 무조건 실패
     if (dayPlans.length === 0) return "fail";
+    
     const doneCount = dayPlans.filter(p => p.is_done).length;
     const goal = Math.ceil(dayPlans.length * 0.5);
     return doneCount >= goal ? "success" : "fail";
@@ -185,7 +192,7 @@ const StudyGroupApp = () => {
     td: { padding: '12px 4px', border: '1px solid #f1f5f9', textAlign: 'center' },
     modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' },
     pwCard: { backgroundColor: 'white', padding: '30px', borderRadius: '24px', width: '100%', maxWidth: '320px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' },
-    guideItem: { display: 'flex', gap: '12px', alignItems: 'flex-start', textAlign: 'left' } // 가이드 아이템 스타일 추가
+    guideItem: { display: 'flex', gap: '12px', alignItems: 'flex-start', textAlign: 'left' }
   };
 
   if (!user) {
