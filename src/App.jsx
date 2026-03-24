@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   ChevronLeft, ChevronRight, Plus, CheckCircle2, 
   Camera, LogOut, Loader2, XCircle, LayoutDashboard, Wallet, ListChecks,
-  Edit2, Trash2, X, Lock
+  Edit2, Trash2, X, Lock, ShieldCheck
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://tjfamywgqesntiidlddi.supabase.co';
@@ -31,6 +31,10 @@ const StudyGroupApp = () => {
   const [zoomImage, setZoomImage] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  // 비밀번호 입력을 위한 상태 (아이폰 최적화용)
+  const [pwModal, setPwModal] = useState({ open: false, targetUser: null, mode: 'login' });
+  const [pwInput, setPwInput] = useState("");
+
   useEffect(() => { fetchMembers(); }, []);
   useEffect(() => { fetchAllPlans(); }, [view, currentDate]);
 
@@ -39,7 +43,7 @@ const StudyGroupApp = () => {
     setMembers(data || []);
   };
 
-  const handleLogin = async (e) => {
+  const handleLoginAttempt = (e) => {
     e.preventDefault();
     const foundUser = members.find(m => m.name === loginInput);
     if (!foundUser) {
@@ -48,25 +52,36 @@ const StudyGroupApp = () => {
     }
 
     if (!foundUser.password) {
-      const newPw = prompt(`${foundUser.name}님, 사용할 숫자 비밀번호를 설정해주세요.`);
-      if (!newPw || isNaN(newPw)) {
-        alert("숫자로만 입력해주세요.");
-        return;
-      }
-      const { error } = await supabase.from('users').update({ password: newPw }).eq('id', foundUser.id);
-      if (error) alert("비밀번호 저장 실패");
-      else {
-        alert("비밀번호가 설정되었습니다! 다시 로그인해주세요.");
-        fetchMembers();
-      }
+      setPwModal({ open: true, targetUser: foundUser, mode: 'setup' });
+    } else {
+      setPwModal({ open: true, targetUser: foundUser, mode: 'login' });
+    }
+  };
+
+  const submitPassword = async () => {
+    if (!pwInput || isNaN(pwInput)) {
+      alert("숫자 비밀번호를 입력해주세요.");
       return;
     }
 
-    const inputPw = prompt("비밀번호를 입력하세요.");
-    if (String(foundUser.password) === inputPw) {
-      setUser(foundUser);
+    if (pwModal.mode === 'setup') {
+      const { error } = await supabase.from('users').update({ password: pwInput }).eq('id', pwModal.targetUser.id);
+      if (error) alert("저장 실패");
+      else {
+        alert("비밀번호 설정 완료! 다시 로그인해주세요.");
+        setPwModal({ open: false, targetUser: null, mode: 'login' });
+        setPwInput("");
+        fetchMembers();
+      }
     } else {
-      alert("비밀번호가 틀렸습니다.");
+      if (String(pwModal.targetUser.password) === pwInput) {
+        setUser(pwModal.targetUser);
+        setPwModal({ open: false, targetUser: null, mode: 'login' });
+        setPwInput("");
+      } else {
+        alert("비밀번호가 틀렸습니다.");
+        setPwInput("");
+      }
     }
   };
 
@@ -99,33 +114,21 @@ const StudyGroupApp = () => {
     });
   };
 
-  // 현황판 상태 계산 로직 (수정됨)
   const getDayStatus = (name, dateStr) => {
     const todayStr = getKSTDate();
-    
-    // 오늘보다 미래인 날짜는 아직 판단하지 않음
     if (dateStr > todayStr) return "pending"; 
-
     const dayPlans = allPlans.filter(p => p.user_name === name && p.date === dateStr);
-    
-    // 계획이 0개인 경우 (과거 혹은 오늘 포함) 무조건 실패
     if (dayPlans.length === 0) return "fail";
-    
     const doneCount = dayPlans.filter(p => p.is_done).length;
-    const goal = Math.ceil(dayPlans.length * 0.5); // 50% 반올림 기준
-    const isSuccess = doneCount >= goal;
-
-    return isSuccess ? "success" : "fail";
+    const goal = Math.ceil(dayPlans.length * 0.5);
+    return doneCount >= goal ? "success" : "fail";
   };
 
   const calculateFineForWeek = (name, weekDays) => {
     const todayStr = getKSTDate();
     const sundayStr = weekDays[6];
     if (sundayStr < START_DATE) return 0;
-    
-    // 이번 주 정산은 다음 주 월요일 00:00 이후에만 표시 (혹은 실시간 확인용)
     if (todayStr <= sundayStr) return 0;
-    
     let successCount = 0;
     weekDays.forEach(date => {
       if (getDayStatus(name, date) === "success") successCount++;
@@ -139,7 +142,6 @@ const StudyGroupApp = () => {
       alert("당일 계획의 사진만 업로드할 수 있습니다.");
       return;
     }
-
     const file = e.target.files[0];
     if (!file) return;
     try {
@@ -147,8 +149,7 @@ const StudyGroupApp = () => {
       const fileName = `${Date.now()}.${file.name.split('.').pop()}`;
       await supabase.storage.from('Photos').upload(fileName, file);
       const { data: publicUrlData } = supabase.storage.from('Photos').getPublicUrl(fileName);
-      const publicUrl = publicUrlData.publicUrl;
-      await supabase.from('plans').update({ image_url: publicUrl, is_done: true }).eq('id', plan.id);
+      await supabase.from('plans').update({ image_url: publicUrlData.publicUrl, is_done: true }).eq('id', plan.id);
       fetchPlans(selectedMember.name, currentDate);
       fetchAllPlans();
     } catch (error) { alert(error.message); } finally { setUploading(null); }
@@ -177,11 +178,6 @@ const StudyGroupApp = () => {
     fetchAllPlans();
   };
 
-  const handleMemberSelect = (member) => {
-    setDailyPlans([]);
-    setSelectedMember(member);
-  };
-
   const styles = {
     container: { maxWidth: '100vw', margin: '0', backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '100px', fontFamily: '-apple-system, sans-serif', boxSizing: 'border-box' },
     header: { padding: '20px 16px', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50 },
@@ -190,13 +186,38 @@ const StudyGroupApp = () => {
     table: { width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', fontSize: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
     th: { backgroundColor: '#f8fafc', padding: '12px 4px', border: '1px solid #f1f5f9', color: '#64748b', fontWeight: 'bold' },
     td: { padding: '12px 4px', border: '1px solid #f1f5f9', textAlign: 'center' },
-    modal: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }
+    modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' },
+    pwCard: { backgroundColor: 'white', padding: '30px', borderRadius: '24px', width: '100%', maxWidth: '320px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }
   };
 
   if (!user) {
     return (
       <div style={{...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}}>
-        <form onSubmit={handleLogin} style={{backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)'}}>
+        {/* 비밀번호 입력 모달 (아이폰 숫자 패드용) */}
+        {pwModal.open && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.pwCard}>
+              <ShieldCheck size={40} color="#2563eb" style={{marginBottom:'12px'}}/>
+              <h3 style={{fontSize:'18px', fontWeight:'bold'}}>{pwModal.mode === 'setup' ? '비밀번호 설정' : '비밀번호 확인'}</h3>
+              <p style={{fontSize:'13px', color:'#64748b', margin:'8px 0 20px'}}>{pwModal.targetUser.name}님, 숫자 비밀번호를 입력하세요.</p>
+              <input 
+                type="password" 
+                inputMode="numeric" 
+                pattern="[0-9]*" 
+                autoFocus
+                style={{width:'100%', padding:'15px', borderRadius:'12px', border:'2px solid #e2e8f0', textAlign:'center', fontSize:'24px', letterSpacing:'8px', boxSizing:'border-box'}}
+                value={pwInput}
+                onChange={e => setPwInput(e.target.value)}
+              />
+              <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
+                <button type="button" onClick={() => {setPwModal({open:false}); setPwInput("");}} style={{flex:1, padding:'12px', borderRadius:'12px', border:'none', backgroundColor:'#f1f5f9', color:'#64748b', fontWeight:'bold'}}>취소</button>
+                <button type="button" onClick={submitPassword} style={{flex:2, padding:'12px', borderRadius:'12px', border:'none', backgroundColor:'#2563eb', color:'white', fontWeight:'bold'}}>확인</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleLoginAttempt} style={{backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)'}}>
           <div style={{display:'inline-flex', padding:'12px', backgroundColor:'#eff6ff', borderRadius:'16px', marginBottom:'16px'}}>
             <Lock size={32} color="#2563eb" />
           </div>
@@ -217,7 +238,7 @@ const StudyGroupApp = () => {
   return (
     <div style={styles.container}>
       {zoomImage && (
-        <div style={styles.modal} onClick={() => setZoomImage(null)}>
+        <div style={{...styles.modalOverlay, backgroundColor:'rgba(0,0,0,0.9)'}} onClick={() => setZoomImage(null)}>
           <img src={zoomImage} style={{maxWidth: '100%', maxHeight: '80%', borderRadius: '12px'}} alt="확대" />
         </div>
       )}
@@ -231,7 +252,7 @@ const StudyGroupApp = () => {
         {view === 'members' && !selectedMember && (
           <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
             {members.map(m => (
-              <div key={m.id} onClick={() => handleMemberSelect(m)} style={{backgroundColor: 'white', padding: '30px', borderRadius: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #f1f5f9'}}>
+              <div key={m.id} onClick={() => {setDailyPlans([]); setSelectedMember(m);}} style={{backgroundColor: 'white', padding: '30px', borderRadius: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #f1f5f9'}}>
                 <span style={{fontWeight: 'bold', fontSize: '20px'}}>{m.name}</span>
                 <ChevronRight size={22} color="#cbd5e1"/>
               </div>
@@ -257,23 +278,9 @@ const StudyGroupApp = () => {
                   <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
                     <div style={{flex: 1, fontWeight: 'bold', fontSize: '16px', color: p.is_done ? '#cbd5e1' : (isPast ? '#f87171' : '#334155')}}>{p.task}</div>
                     <div style={{width: 48, height: 48, borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}} onClick={() => p.image_url && setZoomImage(p.image_url)}>
-                      {uploading === p.id ? (
-                        <Loader2 size={20} className="animate-spin" color="#2563eb"/>
-                      ) : p.image_url ? (
-                        <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/>
-                      ) : (
-                        !isPast && user.name === selectedMember.name && (
-                          <label><Camera size={20} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>
-                        )
-                      )}
+                      {uploading === p.id ? <Loader2 size={20} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : (!isPast && user.name === selectedMember.name && <label><Camera size={20} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>)}
                     </div>
-                    {p.is_done ? (
-                      <CheckCircle2 size={28} color="#22c55e"/>
-                    ) : isPast ? (
-                      <XCircle size={28} color="#ef4444"/>
-                    ) : (
-                      <div style={{width: 28, height: 28, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>
-                    )}
+                    {p.is_done ? <CheckCircle2 size={28} color="#22c55e"/> : isPast ? <XCircle size={28} color="#ef4444"/> : <div style={{width: 28, height: 28, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>}
                   </div>
                   {!isPast && user.name === selectedMember.name && (
                     <div style={{display: 'flex', justifyContent: 'flex-end', gap: '15px', marginTop: '12px', borderTop: '1px solid #f8fafc', paddingTop: '8px'}}>
@@ -298,9 +305,7 @@ const StudyGroupApp = () => {
                     <td style={{...styles.td, fontWeight: 'bold'}}>{name}</td>
                     {getWeekDays().map(date => {
                       const status = getDayStatus(name, date);
-                      return <td key={date} style={styles.td}>
-                        {status === "success" ? <CheckCircle2 size={18} color="#22c55e" style={{margin:'auto'}}/> : status === "fail" ? <XCircle size={18} color="#f87171" style={{margin:'auto'}}/> : "-"}
-                      </td>;
+                      return <td key={date} style={styles.td}>{status === "success" ? <CheckCircle2 size={18} color="#22c55e" style={{margin:'auto'}}/> : status === "fail" ? <XCircle size={18} color="#f87171" style={{margin:'auto'}}/> : "-"}</td>;
                     })}
                   </tr>
                 ))}
@@ -312,67 +317,25 @@ const StudyGroupApp = () => {
         {view === 'fines' && (
           <div>
             <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>멤버</th>
-                  <th style={{...styles.th, backgroundColor: '#eff6ff', color: '#2563eb'}}>누적 벌금</th>
-                  <th style={styles.th}>지난 주</th>
-                </tr>
-              </thead>
+              <thead><tr><th style={styles.th}>멤버</th><th style={{...styles.th, backgroundColor: '#eff6ff', color: '#2563eb'}}>누적 벌금</th><th style={styles.th}>지난 주</th></tr></thead>
               <tbody>
                 {['백민영', '전상현', '조재영', '최은빈'].map(name => {
-                  const lastWeekDate = new Date();
-                  lastWeekDate.setDate(lastWeekDate.getDate() - 7);
-                  const lastWeekDays = getWeekDays(lastWeekDate);
-                  const fineLastWeek = calculateFineForWeek(name, lastWeekDays);
-                  return (
-                    <tr key={name}>
-                      <td style={{...styles.td, fontWeight: 'bold'}}>{name}</td>
-                      <td style={{...styles.td, color: '#2563eb', fontWeight: '900'}}>{fineLastWeek.toLocaleString()}원</td>
-                      <td style={styles.td}>{fineLastWeek.toLocaleString()}원</td>
-                    </tr>
-                  );
+                  const lastWeekDate = new Date(); lastWeekDate.setDate(lastWeekDate.getDate() - 7);
+                  const fineLastWeek = calculateFineForWeek(name, getWeekDays(lastWeekDate));
+                  return (<tr key={name}><td style={{...styles.td, fontWeight: 'bold'}}>{name}</td><td style={{...styles.td, color: '#2563eb', fontWeight: '900'}}>{fineLastWeek.toLocaleString()}원</td><td style={styles.td}>{fineLastWeek.toLocaleString()}원</td></tr>);
                 })}
               </tbody>
             </table>
-            
             <div style={{ marginTop: '24px', padding: '24px', backgroundColor: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                 <div style={{ width: '4px', height: '18px', backgroundColor: '#2563eb', borderRadius: '4px' }}></div>
                 <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b', fontWeight: '900' }}>스터디 운영 가이드 🎸</h4>
               </div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>💰</span>
-                  <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
-                    <b style={{ color: '#1e293b' }}>벌금은 매주 월요일 00:00에 누적됩니다.</b><br/>
-                    지난주(월~일) 결과를 정산하여 자동 업데이트됩니다.
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>✅</span>
-                  <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
-                    <b style={{ color: '#1e293b' }}>하루 성공 기준: 목표의 50% 이상 완료</b><br/>
-                    계획이 홀수일 경우 <span style={{ color: '#3b82f6', fontWeight: 'bold' }}>반올림</span> 개수만큼 완료 시 성공!
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>🔥</span>
-                  <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
-                    <b style={{ color: '#1e293b' }}>한 주 성공 기준: ✅ 4일 이상</b><br/>
-                    성공 일수가 <span style={{ color: '#ef4444', fontWeight: 'bold' }}>4일 미만</span>이면 벌금 1,000원이 누적됩니다.
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <span style={{ fontSize: '18px' }}>🗓️</span>
-                  <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
-                    <b style={{ color: '#1e293b' }}>공식 시작일: 3월 23일</b><br/>
-                  </div>
-                </div>
+                <div style={{ display: 'flex', gap: '12px' }}><span style={{ fontSize: '18px' }}>💰</span><div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}><b style={{ color: '#1e293b' }}>벌금은 매주 월요일 00:00에 누적됩니다.</b><br/>지난주 결과를 자동 정산합니다.</div></div>
+                <div style={{ display: 'flex', gap: '12px' }}><span style={{ fontSize: '18px' }}>✅</span><div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}><b style={{ color: '#1e293b' }}>하루 성공 기준: 목표의 50% 이상 완료</b><br/>계획이 홀수일 경우 반올림합니다.</div></div>
+                <div style={{ display: 'flex', gap: '12px' }}><span style={{ fontSize: '18px' }}>🔥</span><div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}><b style={{ color: '#1e293b' }}>한 주 성공 기준: ✅ 4일 이상</b><br/>성공 일수가 4일 미만이면 벌금 1,000원이 누적됩니다.</div></div>
+                <div style={{ display: 'flex', gap: '12px' }}><span style={{ fontSize: '18px' }}>🗓️</span><div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}><b style={{ color: '#1e293b' }}>공식 시작일: 3월 23일</b></div></div>
               </div>
             </div>
           </div>
