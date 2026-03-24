@@ -201,7 +201,7 @@ const StudyGroupApp = () => {
             value={loginInput} 
             onChange={e => setLoginInput(e.target.value)} 
           />
-          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>본인 인증하기</button>
+          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>LOG IN</button>
         </form>
       </div>
     );
