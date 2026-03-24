@@ -47,7 +47,6 @@ const StudyGroupApp = () => {
       return;
     }
 
-    // 비밀번호가 설정되어 있지 않은 경우 (초기 설정)
     if (!foundUser.password) {
       const newPw = prompt(`${foundUser.name}님, 사용할 숫자 비밀번호를 설정해주세요.`);
       if (!newPw || isNaN(newPw)) {
@@ -63,7 +62,6 @@ const StudyGroupApp = () => {
       return;
     }
 
-    // 비밀번호가 이미 있는 경우 확인
     const inputPw = prompt("비밀번호를 입력하세요.");
     if (String(foundUser.password) === inputPw) {
       setUser(foundUser);
@@ -195,9 +193,14 @@ const StudyGroupApp = () => {
           <div style={{display:'inline-flex', padding:'12px', backgroundColor:'#eff6ff', borderRadius:'16px', marginBottom:'16px'}}>
             <Lock size={32} color="#2563eb" />
           </div>
-          <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px'}}>SECURITY ON</h2>
+          <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px'}}>STUDY PLAN</h2>
           <p style={{fontSize:'13px', color:'#64748b', marginTop:'8px'}}>이름 입력 후 본인 비밀번호로 접속하세요.</p>
-          <input style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', margin: '20px 0', fontSize: '16px', boxSizing:'border-box'}} placeholder="이름 입력" value={loginInput} onChange={e => setLoginInput(e.target.value)} />
+          <input 
+            style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', margin: '20px 0', fontSize: '16px', boxSizing:'border-box'}} 
+            placeholder="이름 입력" 
+            value={loginInput} 
+            onChange={e => setLoginInput(e.target.value)} 
+          />
           <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>본인 인증하기</button>
         </form>
       </div>
