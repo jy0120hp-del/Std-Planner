@@ -71,14 +71,26 @@ const StudyGroupApp = () => {
   const getDayStatus = (name, dateStr) => {
     const todayStr = getKSTDate();
     const dayPlans = allPlans.filter(p => p.user_name === name && p.date === dateStr);
-    if (dayPlans.length === 0) return dateStr >= todayStr ? "pending" : "fail";
+    
+    // 계획이 아예 없는 경우
+    if (dayPlans.length === 0) {
+      return dateStr < todayStr ? "fail" : "pending";
+    }
     
     const doneCount = dayPlans.filter(p => p.is_done).length;
-    // 50% 성공 기준 (반올림)
     const goal = Math.ceil(dayPlans.length * 0.5);
     const isSuccess = doneCount >= goal;
 
-    if (dateStr >= todayStr) return isSuccess ? "success" : "pending";
+    // ✅ 핵심 수정: 오늘 날짜라면 아직 시간이 남았으므로 '성공'이더라도 'pending'으로 표시하거나, 
+    // 혹은 성공했을 때만 체크를 띄우고 싶다면 아래 로직을 유지하되 '실패'는 절대 미리 띄우지 않음.
+    if (dateStr === todayStr) {
+      return isSuccess ? "success" : "pending"; 
+    }
+
+    // 미래 날짜
+    if (dateStr > todayStr) return "pending";
+
+    // 과거 날짜: 성공 여부에 따라 확실하게 구분
     return isSuccess ? "success" : "fail";
   };
 
@@ -300,6 +312,7 @@ const StudyGroupApp = () => {
                   <span style={{ fontSize: '18px' }}>🗓️</span>
                   <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
                     <b style={{ color: '#1e293b' }}>공식 시작일: 3월 23일</b><br/>
+                    첫 주 정산은 3월 30일(월)에 이루어집니다. 파이팅!
                   </div>
                 </div>
               </div>
