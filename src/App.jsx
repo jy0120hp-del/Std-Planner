@@ -31,7 +31,6 @@ const StudyGroupApp = () => {
   const [zoomImage, setZoomImage] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  // 비밀번호 입력을 위한 상태 (아이폰 최적화용)
   const [pwModal, setPwModal] = useState({ open: false, targetUser: null, mode: 'login' });
   const [pwInput, setPwInput] = useState("");
 
@@ -50,7 +49,6 @@ const StudyGroupApp = () => {
       alert("등록된 멤버가 아닙니다.");
       return;
     }
-
     if (!foundUser.password) {
       setPwModal({ open: true, targetUser: foundUser, mode: 'setup' });
     } else {
@@ -63,7 +61,6 @@ const StudyGroupApp = () => {
       alert("숫자 비밀번호를 입력해주세요.");
       return;
     }
-
     if (pwModal.mode === 'setup') {
       const { error } = await supabase.from('users').update({ password: pwInput }).eq('id', pwModal.targetUser.id);
       if (error) alert("저장 실패");
@@ -187,13 +184,13 @@ const StudyGroupApp = () => {
     th: { backgroundColor: '#f8fafc', padding: '12px 4px', border: '1px solid #f1f5f9', color: '#64748b', fontWeight: 'bold' },
     td: { padding: '12px 4px', border: '1px solid #f1f5f9', textAlign: 'center' },
     modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' },
-    pwCard: { backgroundColor: 'white', padding: '30px', borderRadius: '24px', width: '100%', maxWidth: '320px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }
+    pwCard: { backgroundColor: 'white', padding: '30px', borderRadius: '24px', width: '100%', maxWidth: '320px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' },
+    guideItem: { display: 'flex', gap: '12px', alignItems: 'flex-start', textAlign: 'left' } // 가이드 아이템 스타일 추가
   };
 
   if (!user) {
     return (
       <div style={{...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}}>
-        {/* 비밀번호 입력 모달 (아이폰 숫자 패드용) */}
         {pwModal.open && (
           <div style={styles.modalOverlay}>
             <div style={styles.pwCard}>
@@ -216,7 +213,6 @@ const StudyGroupApp = () => {
             </div>
           </div>
         )}
-
         <form onSubmit={handleLoginAttempt} style={{backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)'}}>
           <div style={{display:'inline-flex', padding:'12px', backgroundColor:'#eff6ff', borderRadius:'16px', marginBottom:'16px'}}>
             <Lock size={32} color="#2563eb" />
@@ -326,16 +322,37 @@ const StudyGroupApp = () => {
                 })}
               </tbody>
             </table>
+            
             <div style={{ marginTop: '24px', padding: '24px', backgroundColor: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                 <div style={{ width: '4px', height: '18px', backgroundColor: '#2563eb', borderRadius: '4px' }}></div>
                 <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b', fontWeight: '900' }}>스터디 운영 가이드 🎸</h4>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div style={{ display: 'flex', gap: '12px' }}><span style={{ fontSize: '18px' }}>💰</span><div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}><b style={{ color: '#1e293b' }}>벌금은 매주 월요일 00:00에 누적됩니다.</b><br/>지난주 결과를 자동 정산합니다.</div></div>
-                <div style={{ display: 'flex', gap: '12px' }}><span style={{ fontSize: '18px' }}>✅</span><div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}><b style={{ color: '#1e293b' }}>하루 성공 기준: 목표의 50% 이상 완료</b><br/>계획이 홀수일 경우 반올림합니다.</div></div>
-                <div style={{ display: 'flex', gap: '12px' }}><span style={{ fontSize: '18px' }}>🔥</span><div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}><b style={{ color: '#1e293b' }}>한 주 성공 기준: ✅ 4일 이상</b><br/>성공 일수가 4일 미만이면 벌금 1,000원이 누적됩니다.</div></div>
-                <div style={{ display: 'flex', gap: '12px' }}><span style={{ fontSize: '18px' }}>🗓️</span><div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}><b style={{ color: '#1e293b' }}>공식 시작일: 3월 23일</b></div></div>
+                <div style={styles.guideItem}>
+                  <span style={{ fontSize: '18px', lineHeight: '1' }}>💰</span>
+                  <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
+                    <b style={{ color: '#1e293b' }}>벌금은 매주 월요일 00:00에 누적됩니다.</b><br/>지난주 결과를 자동 정산합니다.
+                  </div>
+                </div>
+                <div style={styles.guideItem}>
+                  <span style={{ fontSize: '18px', lineHeight: '1' }}>✅</span>
+                  <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
+                    <b style={{ color: '#1e293b' }}>하루 성공 기준: 목표의 50% 이상 완료</b><br/>계획이 홀수일 경우 반올림합니다.
+                  </div>
+                </div>
+                <div style={styles.guideItem}>
+                  <span style={{ fontSize: '18px', lineHeight: '1' }}>🔥</span>
+                  <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
+                    <b style={{ color: '#1e293b' }}>한 주 성공 기준: ✅ 4일 이상</b><br/>성공 일수가 4일 미만이면 벌금 1,000원이 누적됩니다.
+                  </div>
+                </div>
+                <div style={styles.guideItem}>
+                  <span style={{ fontSize: '18px', lineHeight: '1' }}>🗓️</span>
+                  <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
+                    <b style={{ color: '#1e293b' }}>공식 시작일: 3월 23일</b>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
