@@ -70,23 +70,15 @@ const StudyGroupApp = () => {
 
   const getDayStatus = (name, dateStr) => {
     const todayStr = getKSTDate();
-    
-    // ✅ 1. 오늘 이후의 날짜(미래) 혹은 오늘 날짜는 무조건 대기 상태 표시
-    if (dateStr >= todayStr) {
-      return "pending"; 
-    }
+    if (dateStr >= todayStr) return "pending"; 
 
-    // ✅ 2. 과거 날짜 데이터 필터링
     const dayPlans = allPlans.filter(p => p.user_name === name && p.date === dateStr);
-    
-    // 과거인데 계획이 아예 없다면 무조건 실패
     if (dayPlans.length === 0) return "fail";
     
     const doneCount = dayPlans.filter(p => p.is_done).length;
     const goal = Math.ceil(dayPlans.length * 0.5);
     const isSuccess = doneCount >= goal;
 
-    // 과거 날짜의 최종 성공/실패 여부 반환
     return isSuccess ? "success" : "fail";
   };
 
@@ -104,13 +96,20 @@ const StudyGroupApp = () => {
   };
 
   const handleFileUpload = async (e, plan) => {
+    const todayStr = getKSTDate();
+    if (plan.date !== todayStr) {
+      alert("당일 계획의 사진만 업로드할 수 있습니다.");
+      return;
+    }
+
     const file = e.target.files[0];
     if (!file) return;
     try {
       setUploading(plan.id);
       const fileName = `${Date.now()}.${file.name.split('.').pop()}`;
       await supabase.storage.from('Photos').upload(fileName, file);
-      const { data: { publicUrl } } = supabase.storage.from('Photos').getPublicUrl(fileName);
+      const { data: publicUrlData } = supabase.storage.from('Photos').getPublicUrl(fileName);
+      const publicUrl = publicUrlData.publicUrl;
       await supabase.from('plans').update({ image_url: publicUrl, is_done: true }).eq('id', plan.id);
       fetchPlans(selectedMember.name, currentDate);
       fetchAllPlans();
@@ -202,25 +201,44 @@ const StudyGroupApp = () => {
                 <b>{getKSTDate(currentDate)}</b>
                 <ChevronRight size={18} onClick={() => {const d = new Date(currentDate); d.setDate(d.getDate()+1); setCurrentDate(d);}}/>
               </div>
-              {user.name === selectedMember.name ? <button onClick={addPlan} style={{backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '12px', padding: '8px'}}><Plus size={20}/></button> : <div style={{width: 36}}/>}
+              {user.name === selectedMember.name && getKSTDate(currentDate) >= getKSTDate() ? <button onClick={addPlan} style={{backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '12px', padding: '8px'}}><Plus size={20}/></button> : <div style={{width: 36}}/>}
             </div>
-            {loading ? <div style={{textAlign:'center', padding:'40px'}}><Loader2 className="animate-spin" color="#2563eb" style={{margin:'auto'}}/></div> : dailyPlans.map(p => (
-              <div key={p.id} style={{backgroundColor: 'white', padding: '20px', borderRadius: '20px', border: '1px solid #f1f5f9', marginBottom: '12px'}}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                  <div style={{flex: 1, fontWeight: 'bold', fontSize: '16px', color: p.is_done ? '#cbd5e1' : '#334155'}}>{p.task}</div>
-                  <div style={{width: 48, height: 48, borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}} onClick={() => p.image_url && setZoomImage(p.image_url)}>
-                    {uploading === p.id ? <Loader2 size={20} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : <label><Camera size={20} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)} disabled={user.name !== selectedMember.name}/></label>}
+            {loading ? <div style={{textAlign:'center', padding:'40px'}}><Loader2 className="animate-spin" color="#2563eb" style={{margin:'auto'}}/></div> : dailyPlans.map(p => {
+              const isPast = p.date < getKSTDate();
+              return (
+                <div key={p.id} style={{backgroundColor: 'white', padding: '20px', borderRadius: '20px', border: '1px solid #f1f5f9', marginBottom: '12px'}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                    <div style={{flex: 1, fontWeight: 'bold', fontSize: '16px', color: p.is_done ? '#cbd5e1' : (isPast ? '#f87171' : '#334155')}}>{p.task}</div>
+                    <div style={{width: 48, height: 48, borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}} onClick={() => p.image_url && setZoomImage(p.image_url)}>
+                      {uploading === p.id ? (
+                        <Loader2 size={20} className="animate-spin" color="#2563eb"/>
+                      ) : p.image_url ? (
+                        <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/>
+                      ) : (
+                        // ✅ 수정: 과거 날짜면 카메라 아이콘을 숨겨서 업로드 차단
+                        !isPast && user.name === selectedMember.name && (
+                          <label><Camera size={20} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>
+                        )
+                      )}
+                    </div>
+                    {/* ✅ 수정: 자정이 지났는데 사진이 없으면 빨간 엑스 표시 */}
+                    {p.is_done ? (
+                      <CheckCircle2 size={28} color="#22c55e"/>
+                    ) : isPast ? (
+                      <XCircle size={28} color="#ef4444"/>
+                    ) : (
+                      <div style={{width: 28, height: 28, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>
+                    )}
                   </div>
-                  {p.is_done ? <CheckCircle2 size={28} color="#22c55e"/> : <div style={{width: 28, height: 28, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>}
+                  {!isPast && user.name === selectedMember.name && (
+                    <div style={{display: 'flex', justifyContent: 'flex-end', gap: '15px', marginTop: '12px', borderTop: '1px solid #f8fafc', paddingTop: '8px'}}>
+                      <button onClick={() => updatePlan(p.id, p.task)} style={{border: 'none', background: 'none', fontSize: '12px', color: '#3b82f6', fontWeight: 'bold'}}>수정</button>
+                      <button onClick={() => deletePlan(p.id)} style={{border: 'none', background: 'none', fontSize: '12px', color: '#ef4444', fontWeight: 'bold'}}>삭제</button>
+                    </div>
+                  )}
                 </div>
-                {user.name === selectedMember.name && (
-                  <div style={{display: 'flex', justifyContent: 'flex-end', gap: '15px', marginTop: '12px', borderTop: '1px solid #f8fafc', paddingTop: '8px'}}>
-                    <button onClick={() => updatePlan(p.id, p.task)} style={{border: 'none', background: 'none', fontSize: '12px', color: '#3b82f6', fontWeight: 'bold'}}>수정</button>
-                    <button onClick={() => deletePlan(p.id)} style={{border: 'none', background: 'none', fontSize: '12px', color: '#ef4444', fontWeight: 'bold'}}>삭제</button>
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -308,6 +326,7 @@ const StudyGroupApp = () => {
                   <span style={{ fontSize: '18px' }}>🗓️</span>
                   <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
                     <b style={{ color: '#1e293b' }}>공식 시작일: 3월 23일</b><br/>
+                    첫 주 정산은 3월 30일(월)에 이루어집니다. 파이팅!
                   </div>
                 </div>
               </div>
