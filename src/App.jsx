@@ -326,7 +326,6 @@ const StudyGroupApp = () => {
                   <span style={{ fontSize: '18px' }}>🗓️</span>
                   <div style={{ fontSize: '13px', lineHeight: '1.5', color: '#475569' }}>
                     <b style={{ color: '#1e293b' }}>공식 시작일: 3월 23일</b><br/>
-                    첫 주 정산은 3월 30일(월)에 이루어집니다. 파이팅!
                   </div>
                 </div>
               </div>
