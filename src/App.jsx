@@ -3,14 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   ChevronLeft, ChevronRight, Plus, CheckCircle2, 
   Camera, LogOut, Loader2, XCircle, LayoutDashboard, Wallet, ListChecks,
-  Edit2, Trash2, X
+  Edit2, Trash2, X, Lock
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://tjfamywgqesntiidlddi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqZmFteXdncWVzbnRpaWRsZGRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMjgwMzIsImV4cCI6MjA4OTgwNDAzMn0.XpVeYOcgKujTWsmCWW4Xd0xmmf85CgM_Lu-5_yQnt0w';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const START_DATE = "2026-03-23"; // 스터디 공식 시작일
+const START_DATE = "2026-03-23"; 
 
 const getKSTDate = (date = new Date()) => {
   const offset = 9 * 60 * 60 * 1000;
@@ -37,6 +37,39 @@ const StudyGroupApp = () => {
   const fetchMembers = async () => {
     const { data } = await supabase.from('users').select('*').order('name');
     setMembers(data || []);
+  };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    const foundUser = members.find(m => m.name === loginInput);
+    if (!foundUser) {
+      alert("등록된 멤버가 아닙니다.");
+      return;
+    }
+
+    // 비밀번호가 설정되어 있지 않은 경우 (초기 설정)
+    if (!foundUser.password) {
+      const newPw = prompt(`${foundUser.name}님, 사용할 숫자 비밀번호를 설정해주세요.`);
+      if (!newPw || isNaN(newPw)) {
+        alert("숫자로만 입력해주세요.");
+        return;
+      }
+      const { error } = await supabase.from('users').update({ password: newPw }).eq('id', foundUser.id);
+      if (error) alert("비밀번호 저장 실패");
+      else {
+        alert("비밀번호가 설정되었습니다! 다시 로그인해주세요.");
+        fetchMembers();
+      }
+      return;
+    }
+
+    // 비밀번호가 이미 있는 경우 확인
+    const inputPw = prompt("비밀번호를 입력하세요.");
+    if (String(foundUser.password) === inputPw) {
+      setUser(foundUser);
+    } else {
+      alert("비밀번호가 틀렸습니다.");
+    }
   };
 
   const fetchPlans = async (userName, date) => {
@@ -158,10 +191,14 @@ const StudyGroupApp = () => {
   if (!user) {
     return (
       <div style={{...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}}>
-        <form onSubmit={(e) => { e.preventDefault(); const foundUser = members.find(m => m.name === loginInput); if (foundUser) setUser(foundUser); else alert("이름을 확인해 주세요."); }} style={{backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)'}}>
-          <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px'}}>STUDY MATE</h2>
-          <input style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', margin: '20px 0', fontSize: '16px'}} placeholder="이름 입력" value={loginInput} onChange={e => setLoginInput(e.target.value)} />
-          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>입장하기</button>
+        <form onSubmit={handleLogin} style={{backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)'}}>
+          <div style={{display:'inline-flex', padding:'12px', backgroundColor:'#eff6ff', borderRadius:'16px', marginBottom:'16px'}}>
+            <Lock size={32} color="#2563eb" />
+          </div>
+          <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px'}}>SECURITY ON</h2>
+          <p style={{fontSize:'13px', color:'#64748b', marginTop:'8px'}}>이름 입력 후 본인 비밀번호로 접속하세요.</p>
+          <input style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', margin: '20px 0', fontSize: '16px', boxSizing:'border-box'}} placeholder="이름 입력" value={loginInput} onChange={e => setLoginInput(e.target.value)} />
+          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>본인 인증하기</button>
         </form>
       </div>
     );
@@ -177,7 +214,7 @@ const StudyGroupApp = () => {
 
       <header style={styles.header}>
         <h2 style={{fontWeight: 900, fontSize: '24px'}}>{view === 'members' ? 'MEMBERS' : view === 'progress' ? '진행 현황' : '벌금 현황'}</h2>
-        <button onClick={() => {setUser(null); setView('members'); setSelectedMember(null);}} style={{border: 'none', background: 'none', color: '#94a3b8'}}><LogOut size={22}/></button>
+        <button onClick={() => {setUser(null); setView('members'); setSelectedMember(null); setLoginInput("");}} style={{border: 'none', background: 'none', color: '#94a3b8'}}><LogOut size={22}/></button>
       </header>
 
       <main style={{padding: '16px'}}>
@@ -215,13 +252,11 @@ const StudyGroupApp = () => {
                       ) : p.image_url ? (
                         <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/>
                       ) : (
-                        // ✅ 수정: 과거 날짜면 카메라 아이콘을 숨겨서 업로드 차단
                         !isPast && user.name === selectedMember.name && (
                           <label><Camera size={20} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>
                         )
                       )}
                     </div>
-                    {/* ✅ 수정: 자정이 지났는데 사진이 없으면 빨간 엑스 표시 */}
                     {p.is_done ? (
                       <CheckCircle2 size={28} color="#22c55e"/>
                     ) : isPast ? (
