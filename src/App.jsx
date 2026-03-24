@@ -99,15 +99,20 @@ const StudyGroupApp = () => {
     });
   };
 
+  // 현황판 상태 계산 로직 (수정됨)
   const getDayStatus = (name, dateStr) => {
     const todayStr = getKSTDate();
-    if (dateStr >= todayStr) return "pending"; 
+    
+    // 오늘보다 미래인 날짜는 아직 판단하지 않음
+    if (dateStr > todayStr) return "pending"; 
 
     const dayPlans = allPlans.filter(p => p.user_name === name && p.date === dateStr);
+    
+    // 계획이 0개인 경우 (과거 혹은 오늘 포함) 무조건 실패
     if (dayPlans.length === 0) return "fail";
     
     const doneCount = dayPlans.filter(p => p.is_done).length;
-    const goal = Math.ceil(dayPlans.length * 0.5);
+    const goal = Math.ceil(dayPlans.length * 0.5); // 50% 반올림 기준
     const isSuccess = doneCount >= goal;
 
     return isSuccess ? "success" : "fail";
@@ -117,6 +122,8 @@ const StudyGroupApp = () => {
     const todayStr = getKSTDate();
     const sundayStr = weekDays[6];
     if (sundayStr < START_DATE) return 0;
+    
+    // 이번 주 정산은 다음 주 월요일 00:00 이후에만 표시 (혹은 실시간 확인용)
     if (todayStr <= sundayStr) return 0;
     
     let successCount = 0;
@@ -201,7 +208,7 @@ const StudyGroupApp = () => {
             value={loginInput} 
             onChange={e => setLoginInput(e.target.value)} 
           />
-          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>LOG IN</button>
+          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>로그인하기</button>
         </form>
       </div>
     );
