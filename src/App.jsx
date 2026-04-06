@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   ChevronLeft, ChevronRight, Plus, CheckCircle2, 
   Camera, LogOut, Loader2, XCircle, LayoutDashboard, Wallet, ListChecks,
-  Lock, ShieldCheck
+  Lock, ShieldCheck, Edit2, Trash2
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://tjfamywgqesntiidlddi.supabase.co';
@@ -134,13 +134,26 @@ const StudyGroupApp = () => {
     fetchPlans(user.name, currentDate); fetchAllPlans();
   };
 
+  const updatePlan = async (id, currentTask) => {
+    const newTask = prompt("계획 수정:", currentTask);
+    if (!newTask || newTask === currentTask) return;
+    await supabase.from('plans').update({ task: newTask }).eq('id', id);
+    fetchPlans(selectedMember.name, currentDate); fetchAllPlans();
+  };
+
+  const deletePlan = async (id) => {
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+    await supabase.from('plans').delete().eq('id', id);
+    fetchPlans(selectedMember.name, currentDate); fetchAllPlans();
+  };
+
   const styles = {
     container: { display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f8fafc', overflow: 'hidden' },
     header: { flexShrink: 0, padding: '20px 16px', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 },
     main: { flexGrow: 1, overflowY: 'auto', padding: '16px', paddingBottom: '100px', WebkitOverflowScrolling: 'touch' },
     nav: { flexShrink: 0, height: '80px', backgroundColor: 'white', display: 'flex', justifyContent: 'space-around', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingBottom: 'env(safe-area-inset-bottom)' },
     navBtn: (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: active ? '#2563eb' : '#94a3b8', border: 'none', background: 'none', fontSize: '11px', fontWeight: active ? 'bold' : 'normal' }),
-    card: { backgroundColor: 'white', padding: '20px', borderRadius: '20px', border: '1px solid #f1f5f9', marginBottom: '12px' },
+    card: { backgroundColor: 'white', padding: '16px', borderRadius: '20px', border: '1px solid #f1f5f9', marginBottom: '12px' },
     table: { width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', fontSize: '12px' },
     th: { backgroundColor: '#f8fafc', padding: '12px 4px', border: '1px solid #f1f5f9', color: '#64748b', fontWeight: 'bold' },
     td: { padding: '12px 4px', border: '1px solid #f1f5f9', textAlign: 'center' },
@@ -151,39 +164,13 @@ const StudyGroupApp = () => {
   if (!user) {
     return (
       <div style={{...styles.container, justifyContent: 'center', alignItems: 'center', padding: '20px'}}>
-        {/* 로그인 폼 내부에 flex 정렬을 추가하여 아이콘을 중앙으로 배치 */}
-        <form onSubmit={handleLoginAttempt} style={{
-          backgroundColor: 'white', 
-          padding: '40px 30px', 
-          borderRadius: '32px', 
-          width: '100%', 
-          maxWidth: '400px', 
-          textAlign: 'center', 
-          boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center'
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            padding: '12px', 
-            backgroundColor: '#eff6ff', 
-            borderRadius: '16px', 
-            marginBottom: '16px' 
-          }}>
-            <Lock size={32} color="#2563eb" />
-          </div>
+        <form onSubmit={handleLoginAttempt} style={{ backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ display: 'flex', padding: '12px', backgroundColor: '#eff6ff', borderRadius: '16px', marginBottom: '16px' }}><Lock size={32} color="#2563eb" /></div>
           <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px', margin: '0 0 8px 0'}}>STUDY PLAN</h2>
           <p style={{fontSize:'13px', color:'#64748b', marginBottom: '20px'}}>이름 입력 후 본인 비밀번호로 접속하세요.</p>
-          <input 
-            style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '20px', fontSize: '16px', boxSizing:'border-box'}} 
-            placeholder="이름 입력" 
-            value={loginInput} 
-            onChange={e => setLoginInput(e.target.value)} 
-          />
+          <input style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '20px', fontSize: '16px', boxSizing:'border-box'}} placeholder="이름 입력" value={loginInput} onChange={e => setLoginInput(e.target.value)} />
           <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none', fontSize: '16px'}}>로그인하기</button>
         </form>
-
         {pwModal.open && (
           <div style={styles.modalOverlay}>
             <div style={{backgroundColor:'white', padding:'30px', borderRadius:'24px', width:'100%', maxWidth:'320px', textAlign:'center'}}>
@@ -233,21 +220,50 @@ const StudyGroupApp = () => {
               {user.name === selectedMember.name && getKSTDate(currentDate) >= getKSTDate() ? <button onClick={addPlan} style={{backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '12px', padding: '8px'}}><Plus size={20}/></button> : <div style={{width: 36}}/>}
             </div>
             {loading ? <div style={{textAlign:'center', padding:'40px'}}><Loader2 className="animate-spin" color="#2563eb" style={{margin:'auto'}}/></div> : (
-              dailyPlans.length > 0 ? dailyPlans.map(p => (
-                <div key={p.id} style={styles.card}>
-                  <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                    <div style={{flex: 1, fontWeight: 'bold', color: p.is_done ? '#cbd5e1' : (p.date < getKSTDate() ? '#f87171' : '#334155')}}>{p.task}</div>
-                    <div style={{width: 44, height: 44, borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}} onClick={() => p.image_url && setZoomImage(p.image_url)}>
-                      {uploading === p.id ? <Loader2 size={18} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : (p.date === getKSTDate() && user.name === selectedMember.name && <label><Camera size={18} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>)}
+              dailyPlans.length > 0 ? dailyPlans.map(p => {
+                const isMyPlan = user.name === selectedMember.name;
+                return (
+                  <div key={p.id} style={styles.card}>
+                    <div style={{display: 'flex', alignItems: 'flex-start', gap: '12px'}}>
+                      <div style={{flex: 1, paddingRight: '4px'}}>
+                        <div style={{
+                          fontWeight: 'bold', 
+                          fontSize: '15px', 
+                          lineHeight: '1.4',
+                          color: p.is_done ? '#cbd5e1' : (p.date < getKSTDate() ? '#f87171' : '#334155'),
+                          wordBreak: 'break-all'
+                        }}>
+                          {p.task}
+                        </div>
+                      </div>
+
+                      <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', minWidth: '56px'}}>
+                        {/* 사진 버튼 */}
+                        <div style={{width: 44, height: 44, borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#f8fafc'}} onClick={() => p.image_url && setZoomImage(p.image_url)}>
+                          {uploading === p.id ? <Loader2 size={18} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : (p.date === getKSTDate() && isMyPlan && <label style={{cursor:'pointer'}}><Camera size={18} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>)}
+                        </div>
+
+                        {/* 수정/삭제 버튼: 가로(row) 배치 */}
+                        {isMyPlan && (
+                          <div style={{display: 'flex', flexDirection: 'row', gap: '10px', justifyContent: 'center'}}>
+                            <Edit2 size={16} color="#94a3b8" style={{cursor:'pointer'}} onClick={() => updatePlan(p.id, p.task)}/>
+                            <Trash2 size={16} color="#f87171" style={{cursor:'pointer'}} onClick={() => deletePlan(p.id)}/>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{marginTop: '8px'}}>
+                        {p.is_done ? <CheckCircle2 size={26} color="#22c55e"/> : p.date < getKSTDate() ? <XCircle size={26} color="#ef4444"/> : <div style={{width: 26, height: 26, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>}
+                      </div>
                     </div>
-                    {p.is_done ? <CheckCircle2 size={26} color="#22c55e"/> : p.date < getKSTDate() ? <XCircle size={26} color="#ef4444"/> : <div style={{width: 26, height: 26, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>}
                   </div>
-                </div>
-              )) : <div style={{textAlign:'center', color:'#94a3b8', padding:'40px'}}>등록된 계획이 없습니다.</div>
+                );
+              }) : <div style={{textAlign:'center', color:'#94a3b8', padding:'40px'}}>등록된 계획이 없습니다.</div>
             )}
           </div>
         )}
 
+        {/* ... (이하 progress, fines, nav 영역 동일) ... */}
         {view === 'progress' && (
           <div style={{overflowX: 'auto'}}>
             <table style={styles.table}>
@@ -274,7 +290,6 @@ const StudyGroupApp = () => {
                 })}
               </tbody>
             </table>
-
             <div style={{ marginTop: '4px', padding: '24px', backgroundColor: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                 <div style={{ width: '4px', height: '18px', backgroundColor: '#2563eb', borderRadius: '4px' }}></div>
