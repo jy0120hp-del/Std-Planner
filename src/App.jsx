@@ -1,10 +1,9 @@
-// ... 상단 import 및 초기 설정은 동일 (생략 가능하지만 전체 코드를 드립니다)
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
   ChevronLeft, ChevronRight, Plus, CheckCircle2, 
   Camera, LogOut, Loader2, XCircle, LayoutDashboard, Wallet, ListChecks,
-  Edit2, Trash2, X, Lock, ShieldCheck
+  Lock, ShieldCheck
 } from 'lucide-react';
 
 const SUPABASE_URL = 'https://tjfamywgqesntiidlddi.supabase.co';
@@ -31,33 +30,30 @@ const StudyGroupApp = () => {
   const [uploading, setUploading] = useState(null);
   const [zoomImage, setZoomImage] = useState(null);
   const [loading, setLoading] = useState(false);
-
   const [pwModal, setPwModal] = useState({ open: false, targetUser: null, mode: 'login' });
   const [pwInput, setPwInput] = useState("");
 
   useEffect(() => { fetchMembers(); }, []);
   useEffect(() => { fetchAllPlans(); }, [view, currentDate]);
+  useEffect(() => { if (selectedMember) fetchPlans(selectedMember.name, currentDate); }, [selectedMember, currentDate]);
 
   const fetchMembers = async () => {
     const { data } = await supabase.from('users').select('*').order('name');
     setMembers(data || []);
   };
 
-  // ... (기존 로그인/비밀번호 로직 동일)
   const handleLoginAttempt = (e) => {
     e.preventDefault();
     const foundUser = members.find(m => m.name === loginInput);
     if (!foundUser) { alert("등록된 멤버가 아닙니다."); return; }
-    if (!foundUser.password) setPwModal({ open: true, targetUser: foundUser, mode: 'setup' });
-    else setPwModal({ open: true, targetUser: foundUser, mode: 'login' });
+    setPwModal({ open: true, targetUser: foundUser, mode: foundUser.password ? 'login' : 'setup' });
   };
 
   const submitPassword = async () => {
     if (!pwInput || isNaN(pwInput)) { alert("숫자 비밀번호를 입력해주세요."); return; }
     if (pwModal.mode === 'setup') {
-      const { error } = await supabase.from('users').update({ password: pwInput }).eq('id', pwModal.targetUser.id);
-      if (error) alert("저장 실패");
-      else { alert("비밀번호 설정 완료! 다시 로그인해주세요."); setPwModal({ open: false }); setPwInput(""); fetchMembers(); }
+      await supabase.from('users').update({ password: pwInput }).eq('id', pwModal.targetUser.id);
+      alert("설정 완료! 다시 로그인해주세요."); setPwModal({ open: false }); setPwInput(""); fetchMembers();
     } else {
       if (String(pwModal.targetUser.password) === pwInput) { setUser(pwModal.targetUser); setPwModal({ open: false }); setPwInput(""); }
       else { alert("비밀번호가 틀렸습니다."); setPwInput(""); }
@@ -66,8 +62,7 @@ const StudyGroupApp = () => {
 
   const fetchPlans = async (userName, date) => {
     setLoading(true);
-    const dateStr = getKSTDate(date);
-    const { data } = await supabase.from('plans').select('*').eq('user_name', userName).eq('date', dateStr).order('created_at', { ascending: true });
+    const { data } = await supabase.from('plans').select('*').eq('user_name', userName).eq('date', getKSTDate(date)).order('created_at', { ascending: true });
     setDailyPlans(data || []);
     setLoading(false);
   };
@@ -76,8 +71,6 @@ const StudyGroupApp = () => {
     const { data } = await supabase.from('plans').select('*');
     setAllPlans(data || []);
   };
-
-  useEffect(() => { if (selectedMember) fetchPlans(selectedMember.name, currentDate); }, [selectedMember, currentDate]);
 
   const getWeekDays = (baseDate = new Date()) => {
     const target = new Date(baseDate);
@@ -97,53 +90,42 @@ const StudyGroupApp = () => {
     const dayPlans = allPlans.filter(p => p.user_name === name && p.date === dateStr);
     if (dayPlans.length === 0) return "fail";
     const doneCount = dayPlans.filter(p => p.is_done).length;
-    const goal = Math.ceil(dayPlans.length * 0.5);
-    return doneCount >= goal ? "success" : "fail";
+    return doneCount >= Math.ceil(dayPlans.length * 0.5) ? "success" : "fail";
   };
 
+  // ★ 수정된 벌금 체계: (안 한 날수 * 500원)
   const calculateFineForOneWeek = (name, weekDays) => {
-    const sundayStr = weekDays[6];
-    if (sundayStr < START_DATE) return 0;
-    let successCount = 0;
+    if (weekDays[6] < START_DATE) return 0;
+    let failCount = 0;
     weekDays.forEach(date => {
-      if (getDayStatus(name, date) === "success") successCount++;
+      if (getDayStatus(name, date) === "fail") failCount++;
     });
-    return successCount < 4 ? 1000 : 0;
+    return failCount * 500;
   };
 
-  // ★ 진짜 누적 벌금 계산 로직 (수정됨)
   const calculateTotalFine = (name) => {
     let totalFine = 0;
     const start = new Date(START_DATE);
-    const today = new Date();
-    
-    // "이번 주 월요일" 구하기 (이번 주는 아직 미포함하기 위함)
-    const currentWeekDays = getWeekDays(today);
-    const thisMondayStr = currentWeekDays[0];
-
+    const thisMondayStr = getWeekDays(new Date())[0];
     let checkDate = new Date(start);
     while (getKSTDate(checkDate) < thisMondayStr) {
-      const weekDays = getWeekDays(checkDate);
-      totalFine += calculateFineForOneWeek(name, weekDays);
-      checkDate.setDate(checkDate.getDate() + 7); // 다음주 월요일로 점프
+      totalFine += calculateFineForOneWeek(name, getWeekDays(checkDate));
+      checkDate.setDate(checkDate.getDate() + 7);
     }
     return totalFine;
   };
 
-  // ... (파일 업로드/수정/삭제 로직 동일)
   const handleFileUpload = async (e, plan) => {
-    const todayStr = getKSTDate();
-    if (plan.date !== todayStr) { alert("당일 계획의 사진만 업로드할 수 있습니다."); return; }
+    if (plan.date !== getKSTDate()) { alert("당일 계획만 인증 가능합니다."); return; }
     const file = e.target.files[0];
     if (!file) return;
-    try {
-      setUploading(plan.id);
-      const fileName = `${Date.now()}.${file.name.split('.').pop()}`;
-      await supabase.storage.from('Photos').upload(fileName, file);
-      const { data: publicUrlData } = supabase.storage.from('Photos').getPublicUrl(fileName);
-      await supabase.from('plans').update({ image_url: publicUrlData.publicUrl, is_done: true }).eq('id', plan.id);
-      fetchPlans(selectedMember.name, currentDate); fetchAllPlans();
-    } catch (error) { alert(error.message); } finally { setUploading(null); }
+    setUploading(plan.id);
+    const fileName = `${Date.now()}.${file.name.split('.').pop()}`;
+    await supabase.storage.from('Photos').upload(fileName, file);
+    const { data } = supabase.storage.from('Photos').getPublicUrl(fileName);
+    await supabase.from('plans').update({ image_url: data.publicUrl, is_done: true }).eq('id', plan.id);
+    fetchPlans(selectedMember.name, currentDate); fetchAllPlans();
+    setUploading(null);
   };
 
   const addPlan = async () => {
@@ -153,79 +135,61 @@ const StudyGroupApp = () => {
     fetchPlans(user.name, currentDate); fetchAllPlans();
   };
 
-  const updatePlan = async (id, currentTask) => {
-    const newTask = prompt("계획 수정:", currentTask);
-    if (!newTask || newTask === currentTask) return;
-    await supabase.from('plans').update({ task: newTask }).eq('id', id);
-    fetchPlans(selectedMember.name, currentDate); fetchAllPlans();
-  };
-
-  const deletePlan = async (id) => {
-    if (!confirm("정말 삭제하시겠습니까?")) return;
-    await supabase.from('plans').delete().eq('id', id);
-    fetchPlans(selectedMember.name, currentDate); fetchAllPlans();
-  };
-
-  // ... (스타일 객체 및 렌더링 부분 동일)
   const styles = {
-    container: { maxWidth: '100vw', margin: '0', backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '100px', fontFamily: '-apple-system, sans-serif', boxSizing: 'border-box' },
-    header: { padding: '20px 16px', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 50 },
-    nav: { position: 'fixed', bottom: 0, left: '50%', transform: 'translateX(-50%)', maxWidth: '100vw', width: '100%', backgroundColor: 'white', display: 'flex', justifyContent: 'space-around', padding: '12px 0 24px 0', borderTop: '1px solid #f1f5f9', boxShadow: '0 -4px 12px rgba(0,0,0,0.03)' },
-    navBtn: (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: active ? '#2563eb' : '#94a3b8', border: 'none', background: 'none', fontSize: '11px', fontWeight: active ? 'bold' : 'normal', cursor: 'pointer' }),
-    table: { width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', fontSize: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' },
+    container: { display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f8fafc', overflow: 'hidden' },
+    header: { flexShrink: 0, padding: '20px 16px', backgroundColor: 'white', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 50 },
+    main: { flexGrow: 1, overflowY: 'auto', padding: '16px', paddingBottom: '100px', WebkitOverflowScrolling: 'touch' },
+    nav: { flexShrink: 0, height: '80px', backgroundColor: 'white', display: 'flex', justifyContent: 'space-around', alignItems: 'center', borderTop: '1px solid #f1f5f9', paddingBottom: 'env(safe-area-inset-bottom)' },
+    navBtn: (active) => ({ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', color: active ? '#2563eb' : '#94a3b8', border: 'none', background: 'none', fontSize: '11px', fontWeight: active ? 'bold' : 'normal' }),
+    card: { backgroundColor: 'white', padding: '20px', borderRadius: '20px', border: '1px solid #f1f5f9', marginBottom: '12px' },
+    table: { width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '16px', overflow: 'hidden', fontSize: '12px' },
     th: { backgroundColor: '#f8fafc', padding: '12px 4px', border: '1px solid #f1f5f9', color: '#64748b', fontWeight: 'bold' },
     td: { padding: '12px 4px', border: '1px solid #f1f5f9', textAlign: 'center' },
-    modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', backdropFilter: 'blur(4px)' },
-    pwCard: { backgroundColor: 'white', padding: '30px', borderRadius: '24px', width: '100%', maxWidth: '320px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' },
+    modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' },
     guideItem: { display: 'flex', gap: '12px', alignItems: 'flex-start', textAlign: 'left' }
   };
 
   if (!user) {
     return (
-      <div style={{...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}}>
+      <div style={{...styles.container, justifyContent: 'center', alignItems: 'center', padding: '20px'}}>
+        <form onSubmit={handleLoginAttempt} style={{backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)'}}>
+          <Lock size={32} color="#2563eb" style={{marginBottom:'10px'}}/>
+          <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px'}}>STUDY PLAN</h2>
+          <input style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', margin: '20px 0', boxSizing:'border-box'}} placeholder="이름 입력" value={loginInput} onChange={e => setLoginInput(e.target.value)} />
+          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>로그인</button>
+        </form>
         {pwModal.open && (
           <div style={styles.modalOverlay}>
-            <div style={styles.pwCard}>
+            <div style={{backgroundColor:'white', padding:'30px', borderRadius:'24px', width:'100%', maxWidth:'320px', textAlign:'center'}}>
               <ShieldCheck size={40} color="#2563eb" style={{marginBottom:'12px'}}/>
-              <h3 style={{fontSize:'18px', fontWeight:'bold'}}>{pwModal.mode === 'setup' ? '비밀번호 설정' : '비밀번호 확인'}</h3>
-              <p style={{fontSize:'13px', color:'#64748b', margin:'8px 0 20px'}}>{pwModal.targetUser.name}님, 숫자 비밀번호를 입력하세요.</p>
-              <input type="password" inputMode="numeric" pattern="[0-9]*" autoFocus style={{width:'100%', padding:'15px', borderRadius:'12px', border:'2px solid #e2e8f0', textAlign:'center', fontSize:'24px', letterSpacing:'8px', boxSizing:'border-box'}} value={pwInput} onChange={e => setPwInput(e.target.value)} />
+              <h3 style={{fontWeight:'bold'}}>{pwModal.mode === 'setup' ? '비밀번호 설정' : '비밀번호 확인'}</h3>
+              <input type="password" inputMode="numeric" autoFocus style={{width:'100%', padding:'15px', borderRadius:'12px', border:'2px solid #e2e8f0', textAlign:'center', fontSize:'24px', marginTop:'15px'}} value={pwInput} onChange={e => setPwInput(e.target.value)} />
               <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
-                <button type="button" onClick={() => {setPwModal({open:false}); setPwInput("");}} style={{flex:1, padding:'12px', borderRadius:'12px', border:'none', backgroundColor:'#f1f5f9', color:'#64748b', fontWeight:'bold'}}>취소</button>
-                <button type="button" onClick={submitPassword} style={{flex:2, padding:'12px', borderRadius:'12px', border:'none', backgroundColor:'#2563eb', color:'white', fontWeight:'bold'}}>확인</button>
+                <button onClick={() => setPwModal({open:false})} style={{flex:1, padding:'12px', borderRadius:'12px', border:'none', backgroundColor:'#f1f5f9'}}>취소</button>
+                <button onClick={submitPassword} style={{flex:2, padding:'12px', borderRadius:'12px', border:'none', backgroundColor:'#2563eb', color:'white', fontWeight:'bold'}}>확인</button>
               </div>
             </div>
           </div>
         )}
-        <form onSubmit={handleLoginAttempt} style={{backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)'}}>
-          <div style={{display:'inline-flex', padding:'12px', backgroundColor:'#eff6ff', borderRadius:'16px', marginBottom:'16px'}}><Lock size={32} color="#2563eb" /></div>
-          <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px'}}>STUDY PLAN</h2>
-          <input style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', margin: '20px 0', fontSize: '16px', boxSizing:'border-box'}} placeholder="이름 입력" value={loginInput} onChange={e => setLoginInput(e.target.value)} />
-          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>로그인하기</button>
-        </form>
       </div>
     );
   }
 
   return (
     <div style={styles.container}>
-      {zoomImage && (
-        <div style={{...styles.modalOverlay, backgroundColor:'rgba(0,0,0,0.9)'}} onClick={() => setZoomImage(null)}>
-          <img src={zoomImage} style={{maxWidth: '100%', maxHeight: '80%', borderRadius: '12px'}} alt="확대" />
-        </div>
-      )}
+      {zoomImage && <div style={styles.modalOverlay} onClick={() => setZoomImage(null)}><img src={zoomImage} style={{maxWidth: '100%', maxHeight: '80%'}} /></div>}
 
       <header style={styles.header}>
-        <h2 style={{fontWeight: 900, fontSize: '24px'}}>{view === 'members' ? 'MEMBERS' : view === 'progress' ? '진행 현황' : '벌금 현황'}</h2>
-        <button onClick={() => {setUser(null); setView('members'); setSelectedMember(null); setLoginInput("");}} style={{border: 'none', background: 'none', color: '#94a3b8'}}><LogOut size={22}/></button>
+        <h2 style={{fontWeight: 900, fontSize: '22px'}}>{view === 'members' ? 'MEMBERS' : view === 'progress' ? 'PROGRESS' : 'FINES'}</h2>
+        <button onClick={() => setUser(null)} style={{border:'none', background:'none'}}><LogOut size={22} color="#94a3b8"/></button>
       </header>
 
-      <main style={{padding: '16px'}}>
+      <main style={styles.main}>
         {view === 'members' && !selectedMember && (
           <div style={{display: 'flex', flexDirection: 'column', gap: '12px'}}>
             {members.map(m => (
-              <div key={m.id} onClick={() => {setDailyPlans([]); setSelectedMember(m);}} style={{backgroundColor: 'white', padding: '30px', borderRadius: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #f1f5f9'}}>
-                <span style={{fontWeight: 'bold', fontSize: '20px'}}>{m.name}</span><ChevronRight size={22} color="#cbd5e1"/>
+              <div key={m.id} onClick={() => setSelectedMember(m)} style={{backgroundColor: 'white', padding: '25px', borderRadius: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #f1f5f9', cursor: 'pointer'}}>
+                <span style={{fontWeight: 'bold', fontSize: '18px'}}>{m.name}</span><ChevronRight size={20} color="#cbd5e1"/>
               </div>
             ))}
           </div>
@@ -235,38 +199,34 @@ const StudyGroupApp = () => {
           <div>
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px'}}>
               <button onClick={() => setSelectedMember(null)} style={{border: 'none', background: 'none', fontWeight: 'bold', color: '#64748b'}}>← BACK</button>
-              <div style={{display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: 'white', padding: '8px 16px', borderRadius: '24px', fontSize: '13px', boxShadow: '0 2px 6px rgba(0,0,0,0.03)'}}>
+              <div style={{display: 'flex', alignItems: 'center', gap: '12px', backgroundColor: 'white', padding: '8px 16px', borderRadius: '24px', fontSize: '13px'}}>
                 <ChevronLeft size={18} onClick={() => {const d = new Date(currentDate); d.setDate(d.getDate()-1); setCurrentDate(d);}}/>
                 <b>{getKSTDate(currentDate)}</b>
                 <ChevronRight size={18} onClick={() => {const d = new Date(currentDate); d.setDate(d.getDate()+1); setCurrentDate(d);}}/>
               </div>
               {user.name === selectedMember.name && getKSTDate(currentDate) >= getKSTDate() ? <button onClick={addPlan} style={{backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '12px', padding: '8px'}}><Plus size={20}/></button> : <div style={{width: 36}}/>}
             </div>
-            {loading ? <div style={{textAlign:'center', padding:'40px'}}><Loader2 className="animate-spin" color="#2563eb" style={{margin:'auto'}}/></div> : dailyPlans.map(p => {
-              const isPast = p.date < getKSTDate();
-              return (
-                <div key={p.id} style={{backgroundColor: 'white', padding: '20px', borderRadius: '20px', border: '1px solid #f1f5f9', marginBottom: '12px'}}>
-                  <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                    <div style={{flex: 1, fontWeight: 'bold', fontSize: '16px', color: p.is_done ? '#cbd5e1' : (isPast ? '#f87171' : '#334155')}}>{p.task}</div>
-                    <div style={{width: 48, height: 48, borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}} onClick={() => p.image_url && setZoomImage(p.image_url)}>
-                      {uploading === p.id ? <Loader2 size={20} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : (!isPast && user.name === selectedMember.name && <label><Camera size={20} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>)}
-                    </div>
-                    {p.is_done ? <CheckCircle2 size={28} color="#22c55e"/> : isPast ? <XCircle size={28} color="#ef4444"/> : <div style={{width: 28, height: 28, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>}
+            {loading ? <div style={{textAlign:'center', padding:'40px'}}><Loader2 className="animate-spin" color="#2563eb" style={{margin:'auto'}}/></div> : dailyPlans.map(p => (
+              <div key={p.id} style={styles.card}>
+                <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                  <div style={{flex: 1, fontWeight: 'bold', color: p.is_done ? '#cbd5e1' : (p.date < getKSTDate() ? '#f87171' : '#334155')}}>{p.task}</div>
+                  <div style={{width: 44, height: 44, borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}} onClick={() => p.image_url && setZoomImage(p.image_url)}>
+                    {uploading === p.id ? <Loader2 size={18} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : (p.date === getKSTDate() && user.name === selectedMember.name && <label><Camera size={18} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>)}
                   </div>
+                  {p.is_done ? <CheckCircle2 size={26} color="#22c55e"/> : p.date < getKSTDate() ? <XCircle size={26} color="#ef4444"/> : <div style={{width: 26, height: 26, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
 
         {view === 'progress' && (
           <div style={{overflowX: 'auto'}}>
-            <h3 style={{textAlign: 'center', marginBottom: '20px', fontWeight: 'bold'}}>이번 주 현황</h3>
             <table style={styles.table}>
               <thead><tr><th style={styles.th}>멤버</th>{['월','화','수','목','금','토','일'].map(d => <th key={d} style={styles.th}>{d}</th>)}</tr></thead>
               <tbody>
                 {['백민영', '전상현', '조재영', '최은빈'].map(name => (
-                  <tr key={name}><td style={{...styles.td, fontWeight: 'bold'}}>{name}</td>{getWeekDays().map(date => { const status = getDayStatus(name, date); return <td key={date} style={styles.td}>{status === "success" ? <CheckCircle2 size={18} color="#22c55e" style={{margin:'auto'}}/> : status === "fail" ? <XCircle size={18} color="#f87171" style={{margin:'auto'}}/> : "-"}</td>; })}</tr>
+                  <tr key={name}><td style={{...styles.td, fontWeight: 'bold'}}>{name}</td>{getWeekDays().map(date => { const status = getDayStatus(name, date); return <td key={date} style={styles.td}>{status === "success" ? <CheckCircle2 size={16} color="#22c55e" style={{margin:'auto'}}/> : status === "fail" ? <XCircle size={16} color="#f87171" style={{margin:'auto'}}/> : "-"}</td>; })}</tr>
                 ))}
               </tbody>
             </table>
@@ -274,9 +234,9 @@ const StudyGroupApp = () => {
         )}
 
         {view === 'fines' && (
-          <div>
+          <div style={{display:'flex', flexDirection:'column', gap:'20px'}}>
             <table style={styles.table}>
-              <thead><tr><th style={styles.th}>멤버</th><th style={{...styles.th, backgroundColor: '#eff6ff', color: '#2563eb'}}>누적 벌금</th><th style={styles.th}>지난 주</th></tr></thead>
+              <thead><tr><th style={styles.th}>멤버</th><th style={{...styles.th, backgroundColor:'#eff6ff', color:'#2563eb'}}>누적 벌금</th><th style={styles.th}>지난 주</th></tr></thead>
               <tbody>
                 {['백민영', '전상현', '조재영', '최은빈'].map(name => {
                   const lastWeekDate = new Date(); lastWeekDate.setDate(lastWeekDate.getDate() - 7);
@@ -286,8 +246,9 @@ const StudyGroupApp = () => {
                 })}
               </tbody>
             </table>
-            
-            <div style={{ marginTop: '24px', padding: '24px', backgroundColor: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
+
+            {/* ★ 멘트 그대로 살리고 벌금 체계만 수정 ★ */}
+            <div style={{ marginTop: '4px', padding: '24px', backgroundColor: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                 <div style={{ width: '4px', height: '18px', backgroundColor: '#2563eb', borderRadius: '4px' }}></div>
                 <h4 style={{ margin: 0, fontSize: '15px', color: '#1e293b', fontWeight: '900' }}>스터디 운영 가이드 🎸</h4>
@@ -295,7 +256,7 @@ const StudyGroupApp = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div style={styles.guideItem}><span style={{ fontSize: '18px' }}>💰</span><div style={{ fontSize: '13px', color: '#475569' }}><b>벌금은 매주 월요일 00:00에 누적됩니다.</b><br/>지난주 결과를 자동 정산합니다.</div></div>
                 <div style={styles.guideItem}><span style={{ fontSize: '18px' }}>✅</span><div style={{ fontSize: '13px', color: '#475569' }}><b>하루 성공 기준: 목표의 50% 이상 완료</b><br/>계획이 홀수일 경우 반올림합니다.</div></div>
-                <div style={styles.guideItem}><span style={{ fontSize: '18px' }}>🔥</span><div style={{ fontSize: '13px', color: '#475569' }}><b>한 주 성공 기준: ✅ 4일 이상</b><br/>성공 일수가 4일 미만이면 벌금 1,000원이 누적됩니다.</div></div>
+                <div style={styles.guideItem}><span style={{ fontSize: '18px' }}>🔥</span><div style={{ fontSize: '13px', color: '#475569' }}><b>벌금 산정 기준: 공부 안 한 날 수 × 500원</b><br/>성공하지 못한 날마다 벌금이 차곡차곡 쌓입니다.</div></div>
               </div>
             </div>
           </div>
