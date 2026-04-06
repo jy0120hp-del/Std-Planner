@@ -93,7 +93,6 @@ const StudyGroupApp = () => {
     return doneCount >= Math.ceil(dayPlans.length * 0.5) ? "success" : "fail";
   };
 
-  // ★ 수정된 벌금 체계: (안 한 날수 * 500원)
   const calculateFineForOneWeek = (name, weekDays) => {
     if (weekDays[6] < START_DATE) return 0;
     let failCount = 0;
@@ -152,16 +151,43 @@ const StudyGroupApp = () => {
   if (!user) {
     return (
       <div style={{...styles.container, justifyContent: 'center', alignItems: 'center', padding: '20px'}}>
-        <form onSubmit={handleLoginAttempt} style={{backgroundColor: 'white', padding: '40px 30px', borderRadius: '32px', width: '100%', maxWidth: '400px', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.08)'}}>
-          <Lock size={32} color="#2563eb" style={{marginBottom:'10px'}}/>
-          <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px'}}>STUDY PLAN</h2>
-          <input style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', margin: '20px 0', boxSizing:'border-box'}} placeholder="이름 입력" value={loginInput} onChange={e => setLoginInput(e.target.value)} />
-          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none'}}>로그인</button>
+        {/* 로그인 폼 내부에 flex 정렬을 추가하여 아이콘을 중앙으로 배치 */}
+        <form onSubmit={handleLoginAttempt} style={{
+          backgroundColor: 'white', 
+          padding: '40px 30px', 
+          borderRadius: '32px', 
+          width: '100%', 
+          maxWidth: '400px', 
+          textAlign: 'center', 
+          boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            padding: '12px', 
+            backgroundColor: '#eff6ff', 
+            borderRadius: '16px', 
+            marginBottom: '16px' 
+          }}>
+            <Lock size={32} color="#2563eb" />
+          </div>
+          <h2 style={{color: '#2563eb', fontWeight: 900, fontSize: '28px', margin: '0 0 8px 0'}}>STUDY PLAN</h2>
+          <p style={{fontSize:'13px', color:'#64748b', marginBottom: '20px'}}>이름 입력 후 본인 비밀번호로 접속하세요.</p>
+          <input 
+            style={{width: '100%', padding: '18px', borderRadius: '16px', border: '1px solid #e2e8f0', marginBottom: '20px', fontSize: '16px', boxSizing:'border-box'}} 
+            placeholder="이름 입력" 
+            value={loginInput} 
+            onChange={e => setLoginInput(e.target.value)} 
+          />
+          <button style={{width: '100%', padding: '18px', borderRadius: '16px', backgroundColor: '#2563eb', color: 'white', fontWeight: 'bold', border: 'none', fontSize: '16px'}}>로그인하기</button>
         </form>
+
         {pwModal.open && (
           <div style={styles.modalOverlay}>
             <div style={{backgroundColor:'white', padding:'30px', borderRadius:'24px', width:'100%', maxWidth:'320px', textAlign:'center'}}>
-              <ShieldCheck size={40} color="#2563eb" style={{marginBottom:'12px'}}/>
+              <ShieldCheck size={40} color="#2563eb" style={{marginBottom:'12px', marginInline: 'auto'}}/>
               <h3 style={{fontWeight:'bold'}}>{pwModal.mode === 'setup' ? '비밀번호 설정' : '비밀번호 확인'}</h3>
               <input type="password" inputMode="numeric" autoFocus style={{width:'100%', padding:'15px', borderRadius:'12px', border:'2px solid #e2e8f0', textAlign:'center', fontSize:'24px', marginTop:'15px'}} value={pwInput} onChange={e => setPwInput(e.target.value)} />
               <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
@@ -177,11 +203,11 @@ const StudyGroupApp = () => {
 
   return (
     <div style={styles.container}>
-      {zoomImage && <div style={styles.modalOverlay} onClick={() => setZoomImage(null)}><img src={zoomImage} style={{maxWidth: '100%', maxHeight: '80%'}} /></div>}
+      {zoomImage && <div style={styles.modalOverlay} onClick={() => setZoomImage(null)}><img src={zoomImage} style={{maxWidth: '100%', maxHeight: '80%', borderRadius: '12px'}} /></div>}
 
       <header style={styles.header}>
         <h2 style={{fontWeight: 900, fontSize: '22px'}}>{view === 'members' ? 'MEMBERS' : view === 'progress' ? 'PROGRESS' : 'FINES'}</h2>
-        <button onClick={() => setUser(null)} style={{border:'none', background:'none'}}><LogOut size={22} color="#94a3b8"/></button>
+        <button onClick={() => {setUser(null); setLoginInput("");}} style={{border:'none', background:'none'}}><LogOut size={22} color="#94a3b8"/></button>
       </header>
 
       <main style={styles.main}>
@@ -206,17 +232,19 @@ const StudyGroupApp = () => {
               </div>
               {user.name === selectedMember.name && getKSTDate(currentDate) >= getKSTDate() ? <button onClick={addPlan} style={{backgroundColor: '#2563eb', color: 'white', border: 'none', borderRadius: '12px', padding: '8px'}}><Plus size={20}/></button> : <div style={{width: 36}}/>}
             </div>
-            {loading ? <div style={{textAlign:'center', padding:'40px'}}><Loader2 className="animate-spin" color="#2563eb" style={{margin:'auto'}}/></div> : dailyPlans.map(p => (
-              <div key={p.id} style={styles.card}>
-                <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-                  <div style={{flex: 1, fontWeight: 'bold', color: p.is_done ? '#cbd5e1' : (p.date < getKSTDate() ? '#f87171' : '#334155')}}>{p.task}</div>
-                  <div style={{width: 44, height: 44, borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}} onClick={() => p.image_url && setZoomImage(p.image_url)}>
-                    {uploading === p.id ? <Loader2 size={18} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : (p.date === getKSTDate() && user.name === selectedMember.name && <label><Camera size={18} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>)}
+            {loading ? <div style={{textAlign:'center', padding:'40px'}}><Loader2 className="animate-spin" color="#2563eb" style={{margin:'auto'}}/></div> : (
+              dailyPlans.length > 0 ? dailyPlans.map(p => (
+                <div key={p.id} style={styles.card}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
+                    <div style={{flex: 1, fontWeight: 'bold', color: p.is_done ? '#cbd5e1' : (p.date < getKSTDate() ? '#f87171' : '#334155')}}>{p.task}</div>
+                    <div style={{width: 44, height: 44, borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}} onClick={() => p.image_url && setZoomImage(p.image_url)}>
+                      {uploading === p.id ? <Loader2 size={18} className="animate-spin" color="#2563eb"/> : p.image_url ? <img src={p.image_url} style={{width:'100%', height:'100%', objectFit:'cover'}}/> : (p.date === getKSTDate() && user.name === selectedMember.name && <label><Camera size={18} color="#94a3b8"/><input type="file" accept="image/*" style={{display:'none'}} onChange={e => handleFileUpload(e, p)}/></label>)}
+                    </div>
+                    {p.is_done ? <CheckCircle2 size={26} color="#22c55e"/> : p.date < getKSTDate() ? <XCircle size={26} color="#ef4444"/> : <div style={{width: 26, height: 26, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>}
                   </div>
-                  {p.is_done ? <CheckCircle2 size={26} color="#22c55e"/> : p.date < getKSTDate() ? <XCircle size={26} color="#ef4444"/> : <div style={{width: 26, height: 26, borderRadius: '50%', border: '2px solid #e2e8f0'}}/>}
                 </div>
-              </div>
-            ))}
+              )) : <div style={{textAlign:'center', color:'#94a3b8', padding:'40px'}}>등록된 계획이 없습니다.</div>
+            )}
           </div>
         )}
 
@@ -247,7 +275,6 @@ const StudyGroupApp = () => {
               </tbody>
             </table>
 
-            {/* ★ 멘트 그대로 살리고 벌금 체계만 수정 ★ */}
             <div style={{ marginTop: '4px', padding: '24px', backgroundColor: 'white', borderRadius: '24px', border: '1px solid #f1f5f9', boxShadow: '0 4px 20px rgba(0,0,0,0.02)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
                 <div style={{ width: '4px', height: '18px', backgroundColor: '#2563eb', borderRadius: '4px' }}></div>
